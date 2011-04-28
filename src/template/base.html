@@ -1,0 +1,110 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>{% block title %}Hazlo Analytics{% endblock %}</title>
+    <link type="text/css" rel="stylesheet" href="/stylesheet/base.css">
+    <link type="text/css" rel="stylesheet" href="/stylesheet/ae.css">
+    <link type="text/css" rel="stylesheet" href="/stylesheet/nav.css">
+    {% block head %}{% endblock %}
+  </head>
+  <body {% block bodyattributes %}{% endblock %}>
+    <div class="g-doc">
+
+    <div id="hd" class="g-section">
+
+      <div class="g-section g-tpl-50-50 g-split">
+        <div class="g-unit g-first">
+          <a href="/home">
+          	<img id="ae-logo" src="/stylesheet/hazloanalytics.jpg" width="300" height="47" alt="Hazlo"/>
+          </a>
+        </div>
+        <div class="g-unit">
+        	{%if user%}
+			<a href="{{sign_out}}">Sign out</a>
+			{% else %}
+			<a href="{{sign_in}}">Sign in</a>
+			{%endif%}
+        </div>
+      </div>
+
+      <div id="ae-appbar-lrg" class="g-section">
+        <h1>Energy Risk Manager</h1>
+      </div>
+
+    </div>
+
+
+    <div id="bd" class="g-section">
+
+      <div class="g-section g-tpl-160">
+
+        <div id="ae-lhs-nav" class="g-unit g-first">
+
+          <div id="ae-nav" class="g-c">
+
+            <ul id="menu">
+              <li><a href="/entry/Trade">Trade</a></li>
+              <li><a href="/valuation">Valuation Engine</a></li>
+              <li><a href="/cube">Cube</a></li>
+              <li><a href="/market">Market</a></li>
+              <li><a href="/import">Import</a></li>
+              <li><a href="/script">Script</a></li>  
+              <li><h>Reference Entry</h>
+	              <ul>
+	              	<li><a href="/entry/Commodity">Commodity</a></li>
+	              	<li><a href="/entry/DeliveryPoint">Delivery Point</a></li>
+	              	<li><a href="/entry/UnitOfMeasure">Unit of Measure</a></li>
+	              	<li><a href="/entry/Book">Book</a></li>
+	              	<li><a href="/entry/Derivatives">Derivatives</a></li>
+	              	<li><a href="/entry/Calendar">Calendar</a></li>
+	              	<li><a href="/entry/Holiday">Holiday</a></li>
+	              	<li><a href="/entry/Profile">Profile</a></li>
+	        	  </ul>
+      		  </li>
+            </ul>
+          </div>
+        </div>
+        <div id="ae-content" class="g-unit">
+          {% block body %}{% endblock %}
+        </div>
+
+    </div>
+
+        <div id="ft">
+          <p>
+            &copy;2010 Hazlo Analytics
+          </p>
+        </div>
+    {% block final %}{% endblock %}
+    </div>
+    <script type="text/javascript">
+    //<![CDATA[
+
+    function walk(element, condition, operation) {
+      if (!element) return;
+      if (condition(element)) {
+        operation(element);
+        return;
+      }
+      for (var e = element.firstChild; e != null; e = e.nextSibling) {
+        walk(e, condition, operation);
+      }
+    }
+
+    function isCurrentLink(e) {
+      if (e.tagName != "A") return false;
+      re = new RegExp("^" + e.href + ".*(\\?.*)?$");
+      return re.test(window.location.href);
+    }
+
+    function makeSelected(e) {
+      e.className = "ae-nav-selected";
+    }
+
+    walk(document.getElementById("menu"), isCurrentLink, makeSelected);
+    
+    //]]>
+    </script>
+  </body>
+</html>

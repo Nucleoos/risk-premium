@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	
+	<form action="/cube" method="POST">
+		<table>
+		{{ form.as_table }}
+		</table>
+		<input type="submit" value = "Update Cube">
+	</form>
+	<table class="ae-table">
+		<tr>
+			<td>
+			</td>
+			{% for elements in top %}
+				<th>
+				{{ elements }}
+				</th>
+			{% endfor %}
+		</tr>
+		{% for row in center %}
+		<tr>
+			<th>
+			{{ row.0 }}		
+			</th>
+			{% for elements in row %}
+				{% if  not forloop.first %}
+				<td>
+					{{ elements }}
+				</td>
+				{% endif %}
+			{% endfor %}
+		</tr>
+		{% endfor %}
+	
+	</table>
+{% endblock %}

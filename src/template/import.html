@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table>
+		<td valign="top">
+			<form enctype="multipart/form-data" action="/import" method="POST">
+			<p>
+			{{ form.as_p }}
+			<input type="submit" name = "import" value = "Import Prices">
+			<input type="submit" name = "import" value = "Import Volatilities">
+			<input type="submit" name = "import" value = "Import Interest Rate">
+			</p>
+		</td>
+		</form>
+	</table>
+	<p>{{ done }}</p>
+{% endblock %}

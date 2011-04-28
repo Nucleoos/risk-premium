@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table class="ae-table-plain">
+		<td valign="top">
+			{% if obj_id %}
+				{% if basket %}
+					<form action="/entry/Trade/{{ kind }}/Basket:{{ obj_id }}" method="POST">
+				{% else %}
+					<form action="/entry/Trade/{{ kind }}:{{ obj_id }}" method="POST">
+				{% endif %}
+			{% else %}
+				<form action="/entry/Trade/{{ kind }}:" method="POST">
+			{% endif %}
+			<p>
+			{{ form.as_p }}
+			<input type="submit" name = "entry" value = "Save">
+			</p>
+		</td>
+		<td valign="top">
+			<p>
+				{{ subform.as_p }}
+				{% if basket %}
+					<input type="submit" name = "add" value = "Save and add underlying">
+				{% else %}
+					<button type="button" onClick="changeSubForm(this.form)">Switch to multiple underlyings</button>
+				{% endif %}
+			</p>
+			{% for elements in list %}
+			<li>
+			{{ elements.0 }}
+			(<a href="/entry/Trade/{{ kind }}/Basket:{{ obj_id }}/delete:{{ elements.1 }}">delete</a>)
+			</li>
+			{% endfor %}
+		</td>
+		<td valign="top">
+			<p>
+				{{ subsubform.as_p }}
+				<button type="button">Custom</button>
+			</p>
+		</td>
+		</form>
+	</table>
+	
+<script type="text/javascript">
+
+	// document.getElementById("id_derivative").onchange = changeForm(document.getElementById("id_derivative"))
+	
+	function changeForm(e) {
+		window.location = "/entry/Trade/" + e.value 
+						+ ":?derivative=" + document.getElementById('id_derivative').value
+						+ "&book=" + document.getElementById('id_book').value
+						+ "&strike=" + document.getElementById('id_strike').value
+						+ "&buy_sell=" + document.getElementById('id_buy_sell').value
+						+ "&trade_date=" + document.getElementById('id_trade_date').value 
+						+ "&trade_price=" + document.getElementById('id_trade_price').value
+						+ "&expiry_date=" + document.getElementById('id_expiry_date').value
+						+ "&uom=" + document.getElementById('id_uom').value;
+		return;
+    }
+    
+    function changeSubForm(e) {
+		window.location = "/entry/Trade/" + e.derivative.value + "/Basket:" + {{ obj_id }};
+		return;
+    }
+
+</script>
+{% endblock %}

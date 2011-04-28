@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	
+	<form action="/market" method="POST">
+		<table>
+		{{ form.as_table }}
+		</table>
+		<input type="submit" value = "Show Market">
+	</form>
+	{% if table %}
+	<table class="ae-table">
+		{% for item in table %}
+		<tr>
+		{% for i in item %}
+			<td align="center">
+			{{ i }}
+			</td>
+		{% endfor %}
+		</tr>
+		{% endfor %}
+	</table>
+	{% else %}
+	No Result
+	{% endif %}
+{% endblock %}

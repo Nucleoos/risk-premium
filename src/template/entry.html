@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table class="ae-table-plain">
+		<td valign="top">
+			{% if obj_id %}
+				<form action="/entry/{{ kind }}:{{ obj_id }}" method="POST">
+			{% else %}
+				<form action="/entry/{{ kind }}:" method="POST">
+			{% endif %}
+			<p>
+			{{ form.as_p }}
+			<input type="submit" name = "entry" value = "Save">
+			</p>
+		</td>
+		</form>
+	</table>
+	{{ error }}
+{% endblock %}

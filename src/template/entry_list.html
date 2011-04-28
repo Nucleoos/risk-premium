@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table class="ae-table">
+		<td valign="top">
+			{% if obj_id %}
+				<form action="/entry/{{ kind }}:{{ obj_id }}" method="POST">
+			{% else %}
+				<form action="/entry/{{ kind }}:" method="POST">
+			{% endif %}
+			<p>
+			{{ form.as_p }}
+			<input type="submit" name = "entry" value = "Save">
+			<input type="submit" name = "entry" value = "Add">
+			</p>
+		</td>
+		<td valign="top">
+		Dates
+		{% for elements in list %}
+			<li>
+			{{ elements }}
+			(<a href="/entry/Holiday:{{ obj_id }}/date/delete:{{ elements.year }}-{{ elements.month }}-{{ elements.day }}">delete</a>)
+			</li>
+		{% endfor %}
+		</td>
+		</form>
+	</table>
+	{{ error }}
+{% endblock %}

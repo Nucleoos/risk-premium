@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo Logica - Existing Commodities{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<ul>
+	{% for elements in list %}
+		{% if elements.name %}
+			<li>{{ elements.name }}</li>
+		{% else %}	
+			<li>{{ elements.key.id }}</li>
+		{% endif %}
+		(<a href="/entry/{{ kind }}:{{ elements.key.id }}">edit</a>)
+		(<a href="/entry/{{ kind }}/delete/{{ elements.key.id }}">delete</a>)
+	{% endfor %}
+	</ul>
+	<p>(<a href="/entry/{{ kind }}:">add</a>)</p>
+{% endblock %}

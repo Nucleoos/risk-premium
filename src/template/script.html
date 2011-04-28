@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - Data Entry{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table>
+		<td valign="top">
+			<form action="/script" method="POST">
+			<p>
+			<input type="submit" value = "Run Script">
+			</p>
+		</td>
+		</form>
+		<td>{{ done }}</td>
+	</table>
+{% endblock %}

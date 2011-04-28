@@ -1,0 +1,12 @@
+syntax: glob
+
+*.elc
+*.pyc
+*.csv
+*~
+settings.py
+old/**
+src/django/**
+
+syntax: regexp
+.*\#.*\#$

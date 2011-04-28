@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block body %}
+<table class="ae-table-large">
+	<tr>
+		<td>
+		{% if obj_id %}
+			<form action="/valuation:{{ obj_id }}" method="POST">
+		{% else %}
+			<form action="/valuation" method="POST">
+		{% endif %}
+				<p>
+				{{ search_form.as_p }}
+				<input type="submit" value = "Search" name = "valuation">
+				</p>
+			</form>
+		</td>
+		<td valign="top">
+			<ul>
+			{% for elements in list %}
+				{% if elements.name %}
+					<li>{{ elements.name }}</li>
+				{% else %}
+					<a href="/valuation:{{ elements.key.id }}">{{ elements.key.id }}</a>
+				{% endif %}
+			{% endfor %}
+			</ul>
+		</td>
+	</tr>
+</table>
+{% if obj_id %}
+<table class="ae-table-plain">
+	<tr>
+		<td valign="top">
+			<form action="/valuation:{{ obj_id }}/result" method="POST">
+			<p>
+			{{ form.as_p }}
+			{{ market_form.as_p }}
+			<input type="submit" name = "valuation" value = "Evaluate">
+			</p>
+		</td>
+		<td valign="top">
+			<p>
+				{{ subform.as_p }}
+			</p>
+		</td>
+		<td valign="top">
+			<p>
+				{{ subsubform.as_p }}
+			</p>
+		</td>
+	</tr>
+</table>
+<table class="ae-table">
+	{% for key,value in results.items %}
+	<tr>
+		<th>
+		{{ key }} :
+		</th>
+		<td>
+		{{ value }}
+		</td>
+	</tr>
+	{% endfor %}
+</table>
+{% endif %}
+{% endblock %}
