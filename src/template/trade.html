@@ -40,15 +40,12 @@
 		<td valign="top">
 			<p>
 				{{ subsubform.as_p }}
-				<button type="button">Custom</button>
 			</p>
 		</td>
 		</form>
 	</table>
 	
 <script type="text/javascript">
-
-	// document.getElementById("id_derivative").onchange = changeForm(document.getElementById("id_derivative"))
 	
 	function changeForm(e) {
 		window.location = "/entry/Trade/" + e.value 
@@ -64,7 +61,7 @@
     }
     
     function changeSubForm(e) {
-		window.location = "/entry/Trade/" + e.derivative.value + "/Basket:" + {{ obj_id }};
+		window.location = "/entry/Trade/" + e.derivative.value + "/Basket:" + {{ obj_id }} + "";
 		return;
     }
 

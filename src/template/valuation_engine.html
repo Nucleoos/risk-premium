@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block body %}
+<table class="ae-table-plain">
+  <form action="/valuation/{{ derivative }}" method="POST">
+	<tr>
+	  <td>
+		<p>
+		{{ select_form.as_p }}
+		</p>
+	  </td>
+	</tr>
+	<tr>
+		<td>
+			<p>
+			<h3>Parameters</h3>
+			{{ form.as_p }}
+			<input type="submit" name = "valuation" value = "Evaluate">
+			</p>
+		</td>
+		<td>
+			<p>
+			<h3>Market</h3>
+			{{ market_form.as_p }}
+			</p>
+		</td>
+	</tr>
+  </form>
+</table>
+<table class="ae-table">
+	{% for key,value in results.items %}
+	<tr>
+		<th>
+		{{ key }} :
+		</th>
+		<td>
+		{{ value }}
+		</td>
+	</tr>
+	{% endfor %}
+</table>
+
+<script type="text/javascript">
+	
+    function changeForm(e) {
+		window.location = "/valuation/" + e.value + "";
+		return;
+    }
+
+</script>
+{% endblock %}

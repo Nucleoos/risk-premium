@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
-    <title>{% block title %}Hazlo Analytics{% endblock %}</title>
+    <title>{% block title %}TFB Analytics{% endblock %}</title>
     <link type="text/css" rel="stylesheet" href="/stylesheet/base.css">
     <link type="text/css" rel="stylesheet" href="/stylesheet/ae.css">
     <link type="text/css" rel="stylesheet" href="/stylesheet/nav.css">
@@ -15,13 +15,13 @@
 
       <div class="g-section g-tpl-50-50 g-split">
         <div class="g-unit g-first">
-          <a href="/home">
-          	<img id="ae-logo" src="/stylesheet/hazloanalytics.jpg" width="300" height="47" alt="Hazlo"/>
+          <a href="/">
+          	<img id="ae-logo" src="/stylesheet/tfb.jpg" width="300" height="47" alt="TFB"/>
           </a>
         </div>
         <div class="g-unit">
-        	{%if user%}
-			<a href="{{sign_out}}">Sign out</a>
+        	{% if user %}
+			<a href="{{sign_in}}">Sign out</a>
 			{% else %}
 			<a href="{{sign_in}}">Sign in</a>
 			{%endif%}
@@ -29,7 +29,7 @@
       </div>
 
       <div id="ae-appbar-lrg" class="g-section">
-        <h1>Energy Risk Manager</h1>
+        <h1>Risk Manager</h1>
       </div>
 
     </div>
@@ -44,12 +44,19 @@
           <div id="ae-nav" class="g-c">
 
             <ul id="menu">
-              <li><a href="/entry/Trade">Trade</a></li>
               <li><a href="/valuation">Valuation Engine</a></li>
+              {% if user %}
+              <li><a href="/entry/Trade">Trade</a></li>
+              
               <li><a href="/cube">Cube</a></li>
               <li><a href="/market">Market</a></li>
               <li><a href="/import">Import</a></li>
-              <li><a href="/script">Script</a></li>  
+              <li><a href="/script">Script</a></li>
+              <li><h>Risk</h>
+                <ul>
+                  <li><a href="/risk/VaR">VaR Engine</a></li>
+                  <li><a href="/risk/report">Reporting</a></li>
+                </ul>
               <li><h>Reference Entry</h>
 	              <ul>
 	              	<li><a href="/entry/Commodity">Commodity</a></li>
@@ -60,8 +67,10 @@
 	              	<li><a href="/entry/Calendar">Calendar</a></li>
 	              	<li><a href="/entry/Holiday">Holiday</a></li>
 	              	<li><a href="/entry/Profile">Profile</a></li>
+	              	<li><a href="/entry/Period">Period</a></li>
 	        	  </ul>
       		  </li>
+      		  {% endif %}
             </ul>
           </div>
         </div>
@@ -73,7 +82,7 @@
 
         <div id="ft">
           <p>
-            &copy;2010 Hazlo Analytics
+            &copy;2010 TFB Analytics
           </p>
         </div>
     {% block final %}{% endblock %}

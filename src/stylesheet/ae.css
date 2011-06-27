@@ -48,8 +48,13 @@ h1 {
 /* Tables */
 .ae-table-plain {
   border-collapse: collapse;
-  width: 100%;
 }
+
+.ae-table-plain td {
+  vertical-align: text-top;
+  width : 400px;
+}
+
 .ae-table {
   border: 1px solid #c5d7ef;
   /*border-collapse: collapse;*/
@@ -93,6 +98,8 @@ h1 {
   background-color: #fff;
   padding: .35em 1em .25em .35em;
   margin: 0;
+  border-top: 1px solid #c5d7ef;
+  border-bottom: 1px solid #c5d7ef;
 }
 .ae-table thead th {
   font-weight: bold;
@@ -103,10 +110,6 @@ h1 {
 .ae-table tfoot tr td {
   border-top: 1px solid #c5d7ef;
   background-color: #e5ecf9;
-}
-.ae-table td {
-  border-top: 1px solid #c5d7ef;
-  border-bottom: 1px solid #c5d7ef;
 }
 .ae-even td,
 .ae-even th,
@@ -174,3 +177,7 @@ ol.ae-even {
   padding: 1em;
   display: inline-block;
 }
+
+.errorlist {
+	color:#FF0000;
+	}

@@ -13,6 +13,12 @@ handlers:
   script: $PYTHON_LIB/google/appengine/ext/remote_api/handler.py
   login: admin
 
+- url: /valuation.*
+  script: main.py
+
+- url: /
+  script: main.py
+
 - url: /.*
   script: main.py
   login: admin

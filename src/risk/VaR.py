@@ -11,17 +11,17 @@ from datastore import models
 def VaR(portfolio,market):
 
     percent = .975
+    nsim = 1000
     
     market = Market()
     mtm = portfolio.eval(market)
-    pnl = []    
+    pnl = []
     for i in range(nsim):
         sim_market = market.shock()
         portfolio.eval(sim_market)
         pnl.append(portfolio.mtm - mtm)
         
     VaR = -percentile(pnl,1-percent)
-    
     
 class Market(object):
 

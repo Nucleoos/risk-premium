@@ -2,6 +2,10 @@
 
 {% block body %}
 	<div id="container">
+	{% if user %}
 		Welcome {{ user.nickname }}.
+	{% else %}
+		Welcome! See left menu. Login to enable more features.
+	{% endif %}
 	</div>
 {% endblock %}

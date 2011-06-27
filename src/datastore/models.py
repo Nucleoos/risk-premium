@@ -6,6 +6,7 @@ Created on Dec 18, 2010
 from google.appengine.ext import db
 from pricing import option
 import datetime
+import math
 
 
 class UnitOfMeasure(db.Model):
@@ -20,7 +21,7 @@ class Commodity(db.Model):
     uom =  db.ReferenceProperty(UnitOfMeasure,verbose_name='Unit of Measure',collection_name='commodity_uom')
     
     def reference(self):
-        return 'trade.underlying'
+        return 'underlying'
 
 class Holiday(db.Model):
     
@@ -39,16 +40,21 @@ class Profile(db.Model):
     granularity = db.StringProperty()
     shape_factor = db.ListProperty(float)
 
-class Delivery(db.Model):
+class Period(db.Model):
 
     name = db.StringProperty()
     first_date = db.DateProperty()
     last_date = db.DateProperty()
-    calendar = db.ReferenceProperty(collection_name='delivery_cal')
-    profile = db.ReferenceProperty(collection_name='delivery_profile')
+    type = db.StringProperty()
     
     def reference(self):
-        return 'trade.underlying'
+        return 'underlying.delivery'
+
+class Delivery(db.Model):
+
+    period = db.ReferenceProperty(collection_name='delivery_period')
+    calendar = db.ReferenceProperty(collection_name='delivery_cal')
+    profile = db.ReferenceProperty(collection_name='delivery_profile')
 
 class Underlying(db.Model):
     
@@ -70,7 +76,7 @@ class Book(db.Model):
         return 'trade'
 
 class Trade(db.Model):
-    
+
     book = db.ReferenceProperty()
     date = db.DateProperty()
     derivative = db.ReferenceProperty(collection_name='trade_derivative')
@@ -80,23 +86,31 @@ class Trade(db.Model):
     trade_price = db.FloatProperty()
     expiry = db.DateProperty()
     underlying = db.ListProperty(db.Key)
-    #uom = db.ReferenceProperty(UnitOfMeasure,collection_name='trades')
+    quantity = db.FloatProperty()
     
     def eval(self,market):
         
-        time_to_expiry = (self.expiry - market.eod.date)
-        time_to_expiry = float(time_to_expiry.days)/360
+        
 
         if self.buy_sell == 'Buy':
-            buy_sell = 1 
+            buy_sell = 1
         else: 
             buy_sell = -1
             
         if self.derivative.name == 'Forward':
             
-            self.MTM = (market.price.mid - self.strike) * self.underlying.delivery.volume * buy_sell
+            time_to_expiry = (self.expiry - market.eod.date)
+            time_to_expiry = float(time_to_expiry.days)/365
             
-        elif self.derivative.name == 'Option':
+            discount_factor = math.exp(-market.interest_rate.constant_maturity*time_to_expiry)
+            self.mtm = discount_factor * (market.price.mid - self.strike) * self.quantity * buy_sell
+            self.delta = discount_factor
+            
+        elif self.derivative.name == 'Option on Forward':
+            
+            time_to_expiry = (self.expiry - market.eod.date)
+            time_to_expiry = float(time_to_expiry.days)/365
+        
             mtm = option.black76(self.call_put,
                                        market.price.mid,
                                        self.strike,
@@ -111,9 +125,47 @@ class Trade(db.Model):
                                            #market.irate.constant_maturity,
                                            0.0,
                                            market.volatility.mid)
-            self.mtm = mtm * self.underlying.delivery.volume * buy_sell
-            self.delta = delta * self.underlying.delivery.volume * buy_sell
-        #=======================================================================
+            self.mtm = round(mtm * self.quantity * buy_sell,4)
+            self.delta = round(delta * self.quantity * buy_sell,4)
+            
+        elif self.derivative.name == 'Option on Spot':
+            
+            time_to_expiry = (self.expiry - market.eod.date)
+            time_to_expiry = float(time_to_expiry.days)/365
+        
+            mtm = option.bms(self.call_put,
+                                       market.price.mid,
+                                       self.strike,
+                                       time_to_expiry,
+                                       market.interest_rate.constant_maturity,
+                                       market.volatility.mid,
+                                       0.0)
+            delta = option.bms_delta(self.call_put,
+                                       market.price.mid,
+                                       self.strike,
+                                       time_to_expiry,
+                                       market.interest_rate.constant_maturity,
+                                       market.volatility.mid,
+                                       0.0)
+            self.mtm = round(mtm * self.quantity * buy_sell,4)
+            self.delta = round(delta * self.quantity * buy_sell,4)   
+
+        elif self.derivative.name == 'Spread Option':
+            
+            time_to_expiry = (self.expiry - market[0].eod.date)
+            time_to_expiry = float(time_to_expiry.days)/365
+        
+            mtm = option.kirk95(self.call_put,
+                               [m.price.mid for m in market],
+                               self.strike,
+                               time_to_expiry,
+                               market[0].interest_rate.constant_maturity,
+                               [m.volatility.mid for m in market],
+                               market[0].correlation)
+            
+            self.mtm = round(mtm * self.quantity * buy_sell,4)
+            self.delta = 'Not Available'
+            
         else:
             self.MTM = self.derivative.name + ' is an unknown valuation model.'
 
@@ -130,14 +182,32 @@ class Market(db.Model):
     volatility = db.ReferenceProperty(collection_name='market_volatilities')
     delivery_point = db.ReferenceProperty(DeliveryPoint,collection_name='markets')
     delivery = db.ReferenceProperty(Delivery,collection_name='market_delivery')
+    interest_rate = db.ReferenceProperty(collection_name='irates')
+    correlation = db.FloatProperty()
+    
+class ForwardCurve(db.Model):
+    
+    name = db.StringProperty()
     
 class Price(db.Model):
     
     mid = db.FloatProperty()
     bid = db.FloatProperty()
     offer = db.FloatProperty()
+
+class InterestRate(db.Model):
+    
+    constant_maturity = db.FloatProperty()
     
 class Volatility(db.Model):
+    
+    historical = db.FloatProperty()
+    mid = db.FloatProperty()
+    bid = db.FloatProperty()
+    offer = db.FloatProperty()
+    moneyness = db.FloatProperty()
+
+class Correlation(db.Model):
     
     historical = db.FloatProperty()
     mid = db.FloatProperty()

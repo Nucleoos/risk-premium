@@ -15,16 +15,21 @@ from django.forms.extras.widgets import SelectDateWidget
 from miscellaneous import data_loader
 from google.appengine.api import users
 import time, datetime
+from risk.VaR import VaR
 
 
 LEFT_KIND = [
 ('Book', 'Book'),
 ('Commodity', 'Commodity')]
 
-TOP_KIND = [('Delivery','Delivery')]
+TOP_KIND = [('Period','Period')]
 
 PRODUCT = [('Forward','Forward'),
            ('Option','Option')]
+
+PERIOD_TYPE = [('Week','Week'),
+               ('Month','Month'),
+               ('Year','Year')]
 
 def entry(request,kind,obj_id = None):
 
@@ -130,7 +135,16 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             trade = form.save(commit=False)
             trade.put()
         else:
-            form_error = form.errors
+            underlying_form = UnderlyingForm(data=request.POST)
+            underlying_form.set_choices()
+            delivery_form = DeliveryForm(data=request.POST)
+            delivery_form.set_choices()
+            return render_to_response('trade.html',{'form' : form,
+                                                'obj_id' : trade_id,
+                                                'kind' : derivative,
+                                                'basket' : basket,
+                                                'subform' : underlying_form,
+                                                'subsubform' : delivery_form})
         
         #Underlying
         underlying = models.Underlying.all().filter('trade =',trade).get()
@@ -151,21 +165,34 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             underlying = underlying_form.save(commit=False)
             underlying.put()
         else:
-            underlying_form_error = underlying_form.errors
-            print underlying_form_error
+            delivery_form = DeliveryForm(data=request.POST)
+            delivery_form.set_choices()
+            return render_to_response('trade.html',{'form' : form,
+                                                'obj_id' : trade_id,
+                                                'kind' : derivative,
+                                                'basket' : basket,
+                                                'subform' : underlying_form,
+                                                'subsubform' : delivery_form})
 
         #Delivery term of the trade
         if underlying.delivery:
             delivery_form = DeliveryForm(underlying = underlying,data=request.POST,instance=underlying.delivery)
         else:
             delivery_form = DeliveryForm(underlying = underlying,data=request.POST)
+        
+        delivery_form.set_choices()
             
         if delivery_form.is_valid():
             delivery = delivery_form.save(commit=False)
             delivery.put()
             underlying.delivery = delivery
         else:
-            print delivery_form.errors
+            return render_to_response('trade.html',{'form' : form,
+                                                'obj_id' : trade_id,
+                                                'kind' : derivative,
+                                                'basket' : basket,
+                                                'subform' : underlying_form,
+                                                'subsubform' : delivery_form})
         
         #Saves the underlying key on the trade
         if underlying_form.is_valid():
@@ -222,10 +249,13 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             
             if delivery:
                 #delivery_id = delivery.key().id()
-                delivery_form = DeliveryForm(initial={"date" : underlying_instance.delivery.date,
-                                                   "quantity" : underlying_instance.delivery.quantity})
+                delivery_form = DeliveryForm(initial={"period" : underlying_instance.delivery.period.name,
+                                                      "calendar" : underlying_instance.delivery.calendar.name,
+                                                      "profile" : underlying_instance.delivery.profile.name})
             else:
                 delivery_form = DeliveryForm()
+            
+            delivery_form.set_choices()
             
         else:
             form = ForwardForm(data=request.GET)
@@ -424,40 +454,42 @@ def script(request):
         #trade.put()
             
     if request.method == 'POST':
-    #===========================================================================
-    #    query = models.EndOfDay.all()
-    # 
-    #    for item in query:
-    #        item.delete()
-    #    
-    #    query = models.Market.all()
-    #        
-    #    for item in query:
-    #        item.delete()
-    #        
-    #    query = models.Price.all()
-    #        
-    #    for item in query:
-    #        item.delete()  
+        
+        query = models.EndOfDay.all()
+     
+        for item in query:
+            item.delete()
+        
+        query = models.Market.all()
+            
+        for item in query:
+            item.delete()
+            
+        query = models.Price.all()
+            
+        for item in query:
+            item.delete()  
     #    
     #    query = models.Volatility.all()
     #        
     #    for item in query:
     #        item.delete()
     #        
-    #    query = models.Delivery.all()
-    #        
-    #    for item in query:
-    #        if not(item.underlying):
-    #            item.delete()
-    #===========================================================================
-        query = models.Underlying.all()
+        query = models.Delivery.all()
+            
         for item in query:
             item.delete()
+
+        query = models.Underlying.all()
             
-        query = models.Delivery.all()
         for item in query:
-            item.delete()    
+            item.delete()
+ 
+        query = models.Trade.all()
+            
+        for item in query:
+            item.delete()   
+        
            
         done = 'Completed'
     else:
@@ -467,9 +499,9 @@ def script(request):
 
 def cube(request):
 
-    trade = models.Trade.all()
+    trades = models.Trade.all()
     
-    if trade.get():
+    if trades.get():
     
         if request.method == 'POST':
             
@@ -478,13 +510,10 @@ def cube(request):
             left_ref = left_obj.get().reference()
             
             top_kind = request.POST.get('top_kind','')
-            top_obj = eval('models.' + top_kind + ".all().order('date')")
+            top_obj = eval('models.' + top_kind + ".all().order('first_date').filter('type =','Month')")
             top_ref = top_obj.get().reference()
             
-            top = [top_obj.get().date]
-            for deli in top_obj:
-                if deli.date != top[-1]:
-                    top.append(deli.date)
+            top = [top.name for top in top_obj]
             
             left = [left.name for left in left_obj]
             
@@ -492,31 +521,32 @@ def cube(request):
             #for item in left:
             #    center[counter_left].append(left[counter_left])
             for trade in trades:
-                ix_top = eval('top.index(' + top_ref + '.' + top_kind.lower() + '.date)')
-                ix_left = eval('left.index(' +  left_ref + '.' + left_kind.lower() + '.name)')
-                center[ix_left][ix_top] = center[ix_left][ix_top] + trade.underlying.delivery.quantity
+                for underlying_key in trade.underlying:
+                    underlying = models.Underlying.get_by_id(underlying_key.id_or_name())
+                    ix_top = eval('top.index(' + top_ref + '.' + top_kind.lower() + '.name)')
+                    ix_left = eval('left.index(' +  left_ref + '.' + left_kind.lower() + '.name)')
+                    center[ix_left][ix_top] = center[ix_left][ix_top] + trade.quantity
                 
             form = CubeForm(request.POST)
             
         else:
             
-            delivery = models.Delivery.all().order('date')
+            periods = models.Period.all().order('first_date').filter("type =", 'Month')
             commodity = models.Commodity.all().order('name')
             
-            top = [delivery.get().date]
-            for deli in delivery:
-                if deli.date != top[-1]:
-                    top.append(deli.date)
-            
+            top = [period.name for period in periods]
+
             left = [com.name for com in commodity]
             
             center = [[0 for element in top] for item in left]
             #for item in left:
             #    center[counter_left].append(left[counter_left])
-            for tr in trade:
-                ix_top = top.index(tr.underlying.delivery.date)
-                ix_left = left.index(tr.underlying.commodity.name)
-                center[ix_left][ix_top] = center[ix_left][ix_top] + tr.underlying.delivery.quantity
+            for trade in trades:
+                for underlying_key in trade.underlying:
+                    underlying = models.Underlying.get_by_id(underlying_key.id_or_name())
+                    ix_top = top.index(underlying.delivery.period.name)
+                    ix_left = left.index(underlying.commodity.name)
+                    center[ix_left][ix_top] = center[ix_left][ix_top] + trade.quantity
         
             form = CubeForm()
         
@@ -532,102 +562,227 @@ def cube(request):
         top = 'No trade are saved. Please create a trade before using this tool.'
         
     return render_to_response('cube.html',{'center' : center,'left' : left, 'top' : top,'form' : form})
-        
-def welcome(request):
+
+def VaR(request):
     
-    user = users.get_current_user
+    user = users.get_current_user()
     
     if user:
         logout_url = users.create_logout_url("/")
-        return render_to_response("welcome.html",{'user':user,'sign_out':logout_url})
+        result = VaR()
+        return render_to_response("VaR.html",{'user':user,'sign_out':logout_url,'result':result})
     else:
         return render_to_response("welcome.html")
+        
+def welcome(request):
     
-def valuation(request,obj_id = None):
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
+    return render_to_response("welcome.html",{'user':user,'sign_in':loginout_url})
+
+def valuation_engine(request,derivative = 'Option on Spot'):
     
-    results = None
-    form = None
-    subform = None
-    subsubform = None
-    if obj_id:
-        db_obj = models.Trade.get_by_id(int(obj_id))
-        form = TradeForm(instance = db_obj)
-        form.set_choices()
-        subkind = form.reference()
-        if subkind:
-            subobj_id = eval('db_obj.' + subkind.lower() + '.key().id()')
-            subform = eval(subkind + 'Form(initial={"commodity" : db_obj.underlying.commodity.name,"delivery_point" : db_obj.underlying.delivery_point.name})')
-            subform.set_choices()
-            subsubkind = subform.reference()
-            if subsubkind:
-                subsubdb_obj = eval('db_obj.' + subkind.lower() + '.'+ subsubkind.lower())
-                if subsubdb_obj:
-                    subsubobj_id = subsubdb_obj.key().id()
-                    subsubform = eval(subsubkind + 'Form(initial={"date" : db_obj.underlying.delivery.date,"quantity" : db_obj.underlying.delivery.quantity})')
-                else:
-                    subsubform = eval(subsubkind + 'Form()')
-                    
+    user = users.get_current_user()
+
+    if user:
+        login_url = users.create_logout_url("/valuation")
+    else:
+        login_url = users.create_login_url("/valuation")
+    
     if request.method == 'POST':
         
-        trades = models.Trade.all()
+        select_form = SelectDerivativeForm(request.POST)
         
-        if request.POST.get('commodity') != 'None':
-            commodity_instance = models.Commodity.all(keys_only=True).filter("name =",request.POST.get('commodity')).get()
-            underlying_query = models.Underlying.all(keys_only=True).filter("commodity =",commodity_instance)
-            trades.filter("underlying in", [x for x in underlying_query])
-        
-        if request.POST.get('book') != 'None':
-            book_instance = models.Book.all(keys_only=True).filter("name =", request.POST.get('book')).get()
-            trades.filter("book =", book_instance)
+        if derivative == 'Spread Option':
+            form = ValuationParameterForm(request.POST)
+            market_form = ValuationMarketForm(request.POST)
             
-        if request.POST.get('derivative') != 'None':
-            derivative_instance = models.Derivatives.all(keys_only=True).filter("name =", request.POST.get('derivative')).get()
-            trades.filter("derivative =", derivative_instance)
-        
-        search_form = SearchForm(request.POST)
-        search_form.set_choices()
-        
-        market_form = MarketForm(request.POST)
-        market_form.set_choices()
-        
-        if request.POST.get('valuation', '') == 'Evaluate':
+                        
+            if form.is_valid() and select_form.is_valid() and market_form.is_valid():
+                strike = form.cleaned_data['strike']
+                expiry = form.cleaned_data['expiry_date']
+                buy_sell = form.cleaned_data['buy_sell']
+                call_put = form.cleaned_data['call_put']
+                quantity = form.cleaned_data['quantity']
+                date = form.cleaned_data['valuation_date']
+                price = []
+                price.append(market_form.cleaned_data['underlying_price'])
+                price.append(market_form.cleaned_data['underlying_price_2'])
+                vol=[]
+                vol.append(market_form.cleaned_data['volatility'])
+                vol.append(market_form.cleaned_data['volatility_2'])
+                corr = market_form.cleaned_data['correlation']
+                interest_rate = market_form.cleaned_data['interest_rate']
+                derivative = select_form.cleaned_data['derivative']
+            else:
+                return render_to_response("valuation_engine.html",{'user':user,'sign_in':login_url,
+                                                                   'form' : form,'select_form' : select_form,
+                                                                   'market_form':market_form,
+                                                                   'derivative':derivative})
+                
+            derivative_instance = models.Derivatives.all().filter('name =',derivative).get()
             
-            eod = time.strptime(request.POST.get('eod', ''),"%Y-%m-%d")
-            eod = datetime.date(eod[0],eod[1],eod[2])
-            eod = models.EndOfDay.all(keys_only=True).filter("date =",eod).get()
+            eod = models.EndOfDay(date=date)
+            eod.put()
             
-            delivery_instance = models.Delivery.all(keys_only=True).filter("date =",db_obj.underlying.delivery.date).filter("quantity =",1.0).get()
+            interest_rate = models.InterestRate(constant_maturity=interest_rate)
+            interest_rate.put()    
+                
+            trade = models.Trade(derivative=derivative_instance,
+                          strike=strike,
+                          buy_sell=buy_sell,
+                          call_put=call_put,
+                          expiry=expiry,
+                          quantity=quantity)
+            
+            price = [models.Price(mid=p) for p in price]
+            [p.put() for p in price]
 
-            market = models.Market.all()
-            market.filter("delivery_point =",db_obj.underlying.delivery_point).filter('eod =',eod).filter("delivery =",delivery_instance)
+            volatility = [models.Volatility(mid=v) for v in vol]
+            [v.put() for v in volatility]
+            
+            market = []
+            for i in range(len(price)):
+                market.append(models.Market(eod=eod,
+                                            price=price[i],
+                                            volatility=volatility[i],
+                                            interest_rate=interest_rate,
+                                            correlation=corr))
+            
+            trade.eval(market)
+            results = {'MTM' : trade.mtm,'Delta' : trade.delta}                  
+            
+            [p.delete() for p in price]
+            [v.delete() for v in volatility]
+                            
+        elif derivative == 'Forward':
+            form = ForwardParameterForm(request.POST)
+            market_form = ForwardMarketForm(request.POST)
+            
+            if form.is_valid() and select_form.is_valid() and market_form.is_valid():
+                strike = form.cleaned_data['strike']
+                expiry = form.cleaned_data['expiry_date']
+                buy_sell = form.cleaned_data['buy_sell']
+                quantity = form.cleaned_data['quantity']
+                date = form.cleaned_data['valuation_date']
+                price = market_form.cleaned_data['underlying_price']
+                interest_rate = market_form.cleaned_data['interest_rate']
+                derivative = select_form.cleaned_data['derivative']
+            else:
+                return render_to_response("valuation_engine.html",{'user':user,'sign_in':login_url,
+                                                                   'form' : form,'select_form' : select_form,
+                                                                   'market_form':market_form,
+                                                                   'derivative':derivative})
+                
+            derivative_instance = models.Derivatives.all().filter('name =',derivative).get()
+            
+            eod = models.EndOfDay(date=date)
+            eod.put()
+            
+            interest_rate = models.InterestRate(constant_maturity=interest_rate)
+            interest_rate.put()
+            
+            trade = models.Trade(derivative=derivative_instance,
+                          strike=strike,
+                          buy_sell=buy_sell,
+                          expiry=expiry,
+                          quantity=quantity)
+            
+            price = models.Price(mid=price)
+            price.put()
+            
+            market = models.Market(eod=eod,price=price,interest_rate=interest_rate)
+            
+            trade.eval(market)
+            results = {'MTM' : trade.mtm,'Delta' : trade.delta}
+            
+            price.delete()
+                     
+        else:
+            form = ValuationParameterForm(request.POST)
+            market_form = OptionMarketForm(request.POST)
+            
+            if form.is_valid() and select_form.is_valid() and market_form.is_valid():
+                strike = form.cleaned_data['strike']
+                expiry = form.cleaned_data['expiry_date']
+                buy_sell = form.cleaned_data['buy_sell']
+                call_put = form.cleaned_data['call_put']
+                quantity = form.cleaned_data['quantity']
+                date = form.cleaned_data['valuation_date']
+                price = market_form.cleaned_data['underlying_price']
+                vol=market_form.cleaned_data['volatility']
+                interest_rate = market_form.cleaned_data['interest_rate']
+                derivative = select_form.cleaned_data['derivative']
+            else:
+                return render_to_response("valuation_engine.html",{'user':user,'sign_in':login_url,
+                                                                   'form' : form,'select_form' : select_form,
+                                                                   'market_form':market_form,
+                                                                   'derivative':derivative})
+        
+        
+            derivative_instance = models.Derivatives.all().filter('name =',derivative).get()
+            
+            eod = models.EndOfDay(date=date)
+            eod.put()
+            
+            interest_rate = models.InterestRate(constant_maturity=interest_rate)
+            interest_rate.put()
 
-            db_obj.eval(market.get())
-            results = {'MTM' : db_obj.mtm,'Delta' : db_obj.delta}
+            trade = models.Trade(derivative=derivative_instance,
+                          strike=strike,
+                          buy_sell=buy_sell,
+                          call_put=call_put,
+                          expiry=expiry,
+                          quantity=quantity)
+            
+            price = models.Price(mid=price)
+            price.put() 
 
-        return render_to_response("search.html",{'search_form' :  search_form,
-                                                 'form' : form,
-                                                 'subform' : subform,
-                                                 'subsubform' : subsubform,
-                                                 'market_form' : market_form,
-                                                 'list' : trades,
-                                                 'obj_id' : obj_id,
-                                                 'results': results})
+            volatility = models.Volatility(mid=vol)
+            volatility.put()
+
+            market = models.Market(eod=eod,price=price,volatility=volatility,interest_rate=interest_rate)
+        
+            trade.eval(market)
+            results = {'MTM' : trade.mtm,'Delta' : trade.delta}
+            
+            price.delete()
+            volatility.delete()
+        
+        eod.delete()
+        interest_rate.delete()
+        
+        return render_to_response("valuation_engine.html",{'user':user,
+                                                           'sign_in':login_url,
+                                                           'form' : form,
+                                                           'select_form':select_form,
+                                                           'market_form':market_form,
+                                                           'derivative':derivative,
+                                                           'results': results})
         
     else:
         
-        search_form = SearchForm()
-        search_form.set_choices()
-        
-        market_form = MarketForm()
-        market_form.set_choices()
-        
-        return render_to_response("search.html",{'search_form' :  search_form,
-                                                 'form' : form,
-                                                 'subform' : subform,
-                                                 'subsubform' : subsubform,
-                                                 'market_form' : market_form,
-                                                 'obj_id' : obj_id})
-
+        if derivative == 'Spread Option':
+            form = ValuationParameterForm()
+            market_form = ValuationMarketForm()
+        elif derivative == 'Forward':
+            form = ForwardParameterForm()
+            market_form = ForwardMarketForm()
+        else:
+            form = ValuationParameterForm()
+            market_form = OptionMarketForm()
+            
+        select_form = SelectDerivativeForm({'derivative':derivative})
+        return render_to_response("valuation_engine.html",{'user':user,'sign_in':login_url,
+                                                           'form' : form,'select_form':select_form,
+                                                           'market_form':market_form,
+                                                           'derivative':derivative})
+    
+    
 def market(request):
     
     if request.method == 'POST':
@@ -647,11 +802,11 @@ def market(request):
         if request.POST.get('type', '')=='Price':
             table = [['Delivery','Mid','Bid','Offer']]
             for item in market:
-                table.append([item.delivery.date,item.price.mid,item.price.bid,item.price.offer])
+                table.append([item.delivery.period.name,item.price.mid,item.price.bid,item.price.offer])
         elif request.POST.get('type', '')=='Volatility':
             table = [['Delivery','Mid','Moneyness']]
             for item in market:
-                table.append([item.delivery.date,item.volatility.mid,item.volatility.moneyness])
+                table.append([item.delivery.period.name,item.volatility.mid,item.volatility.moneyness])
         else:
             table = []
             pass
@@ -661,7 +816,7 @@ def market(request):
     else:
         market_form = MarketForm()
         market_form.set_choices()
-    
+
         return render_to_response("market.html",{'form':market_form})
         
 class CommodityForm(djangoforms.ModelForm):
@@ -707,33 +862,47 @@ class CommodityForm(djangoforms.ModelForm):
 
 class DeliveryForm(forms.Form):
     
-    date = fields.DateField(label = 'Delivery Date',widget=SelectDateWidget())
-    quantity = fields.FloatField(label = 'Quantity')
+    period = fields.ChoiceField()
+    calendar = fields.ChoiceField()
+    profile = fields.ChoiceField()
     
     def __init__(self, *args, **kwargs):
-        self.underlying = kwargs.get('underlying',None)
         data = kwargs.get('data',None)
         self.instance =kwargs.get('instance',None)
         if data:
             super(DeliveryForm, self).__init__(data=data)
         elif self.instance:
-            initial = {'date':self.instance.date,
-                      'quantity':self.instance.quantity}
+            initial = {'period':self.instance.period,
+                      'calendar':self.instance.calendar,
+                      'profile':self.instance.profile}
             super(DeliveryForm, self).__init__(data=initial)
         else:
             super(DeliveryForm, self).__init__(*args, **kwargs)
         
     def set_choices(self):
-        pass
+        period = models.Period.all().order('name')
+        self['period'].field.choices = [(x.name,x.name) for x in period]
+        calendar = models.Calendar.all().order('name')
+        self['calendar'].field.choices = [(x.name,x.name) for x in calendar]
+        profile = models.Profile.all().order('name')
+        self['profile'].field.choices = [(x.name,x.name) for x in profile]
     
     def save(self, commit=True):
+        period = models.Period.all()
+        period.filter("name =", self.cleaned_data['period'])
+        calendar = models.Calendar.all()
+        calendar.filter("name =", self.cleaned_data['calendar'])
+        profile = models.Profile.all()
+        profile.filter("name =", self.cleaned_data['profile'])
         if self.instance:
             instance = self.instance
-            instance.date = self.cleaned_data['date']
-            instance.quantity = self.cleaned_data['quantity']
-            instance.underlying = self.underlying
+            instance.period = period.get()
+            instance.calendar = calendar.get()
+            instance.profile = profile.get()
         else:
-            instance = models.Delivery(underlying = self.underlying, date = self.cleaned_data['date'],quantity = self.cleaned_data['quantity'])
+            instance = models.Delivery(period = period.get(),
+                                       calendar = calendar.get(),
+                                       profile = profile.get())
         if commit:
             instance.put()
         return instance
@@ -820,6 +989,8 @@ class SingleUnderlyingForm(UnderlyingForm):
         
 class TradeForm(forms.Form):
     
+    error_css_class = 'error'
+    
     trade_date = fields.DateField(label = 'Trade Date',initial = datetime.date.today(),required = False)
     book = fields.ChoiceField(label='Book',required = False)
     derivative = fields.ChoiceField(label='Class of Derivatives',required = False)
@@ -829,7 +1000,7 @@ class TradeForm(forms.Form):
     call_put = fields.ChoiceField(label='Call or Put',choices=[('Call','Call'),('Put','Put')],required = False)
     trade_price = fields.FloatField(label='Premium',required = False)
     expiry_date = fields.DateField(label = 'Expiry Date',initial = datetime.date.today(),required = False)
-    #instance = None
+    quantity = fields.FloatField(required = False)
 
     def __init__(self,*args, **kwargs):
 
@@ -846,7 +1017,8 @@ class TradeForm(forms.Form):
                       'buy_sell':self.instance.buy_sell,
                       'call_put':self.instance.call_put,
                       'trade_price':self.instance.trade_price,
-                      'expiry_date':self.instance.expiry}
+                      'expiry_date':self.instance.expiry,
+                      'quantity':self.instance.quantity}
             #initial = instance2
             #x = y
             super(TradeForm, self).__init__(data = initial)
@@ -878,6 +1050,7 @@ class TradeForm(forms.Form):
             instance.call_put = self.cleaned_data['call_put']
             instance.trade_price = self.cleaned_data['trade_price']
             instance.expiry = self.cleaned_data['expiry_date']
+            instance.quantity = self.cleaned_data['quantity']
         else:
             instance = models.Trade(date = self.cleaned_data['trade_date'],
                                     book = book.get(),
@@ -887,7 +1060,8 @@ class TradeForm(forms.Form):
                                     call_put = self.cleaned_data['call_put'],
                                     trade_price = self.cleaned_data['trade_price'],
                                     expiry = self.cleaned_data['expiry_date'],
-                                    underlying = [])
+                                    underlying = [],
+                                    quantity = self.cleaned_data['quantity'])
         
         if commit:
             instance.put()
@@ -981,9 +1155,10 @@ class ProfileForm(forms.Form):
     
     name = fields.CharField()
     granularity = fields.ChoiceField()
-    field = (fields.FloatField(label='one'),
-            fields.CharField(label='two'))
-    shape_factor = fields.MultiValueField(fields=field)
+#    field = (fields.FloatField(label='January'),
+#            fields.FloatField(label='February'),
+#            fields.FloatField(label='march'))
+#    shape_factor = fields.MultiValueField(fields=field)
 
     def __init__(self, *args, **kwargs):
         data = kwargs.get('data',None)
@@ -993,14 +1168,14 @@ class ProfileForm(forms.Form):
             super(ProfileForm, self).__init__(data=data)
         elif self.instance:
             initial = {'name':self.instance.name,
-                       'weekend':self.instance.weekend,
-                       'holiday':self.instance.holiday}
+                       'granularity':self.instance.granularity,
+                       'shape_factor':self.instance.shape_factor}
             super(ProfileForm, self).__init__(data=initial)
         else:
             super(ProfileForm, self).__init__(*args, **kwargs)
 
     def set_choices(self):
-        choices=[('yearly','yearly'),('monthly','monthly'),('hourly','hourly')]
+        choices=[('yearly','yearly'),('monthly','monthly'),('weekly','weekly'),('daily','daily'),('hourly','hourly')]
         self['granularity'].field.choices = choices
         
     def reference(self):
@@ -1099,6 +1274,52 @@ class DeliveryPointForm(forms.Form):
         if commit:
             instance.put()
         return instance
+
+class PeriodForm(forms.Form):
+    
+    name = fields.CharField()
+    first_date = fields.DateField(label = 'Start Date')
+    last_date = fields.DateField(label='End Date')
+    type = fields.ChoiceField()
+
+    def __init__(self, *args, **kwargs):
+        data = kwargs.get('data',None)
+        self.instance = kwargs.get('instance',None)
+        
+        if data:
+            super(PeriodForm, self).__init__(data=data)
+        elif self.instance:
+            initial = {'name':self.instance.name,
+                       'first_date':self.instance.first_date,
+                       'last_date':self.instance.last_date,
+                       'type':self.instance.type}
+            super(PeriodForm, self).__init__(data=initial)
+        else:
+            super(PeriodForm, self).__init__(*args, **kwargs)
+
+    def set_choices(self):
+        self['type'].field.choices = PERIOD_TYPE
+              
+    def reference(self):
+        
+        pass
+
+    def save(self, commit=True):
+
+        if self.instance:
+            instance = self.instance
+            instance.name = self.cleaned_data['name']
+            instance.first_date = self.cleaned_data['first_date']
+            instance.last_date = self.cleaned_data['last_date']
+            instance.type = self.cleaned_data['type']
+        else:
+            instance = models.Period(name = self.cleaned_data['name'],
+                                     first_date = self.cleaned_data['first_date'],
+                                     last_date = self.cleaned_data['last_date'],
+                                     type = self.cleaned_data['type'])
+        if commit:
+            instance.put()
+        return instance
     
 class CubeForm(forms.Form):
     
@@ -1144,3 +1365,47 @@ class MarketForm(forms.Form):
 class ImportForm(forms.Form):
 
     file = forms.FileField()
+    
+class ValuationParameterForm(forms.Form):
+    
+    valuation_date = fields.DateField(label='Valuation_Date',initial = datetime.date.today(),widget=SelectDateWidget())
+    buy_sell = fields.ChoiceField(label='Buy or Sell',choices=[('Buy','Buy'),('Sell','Sell')])
+    call_put = fields.ChoiceField(label='Call or Put',choices=[('Call','Call'),('Put','Put')])
+    quantity = fields.FloatField()
+    strike = fields.FloatField(label='Strike')
+    expiry_date = fields.DateField(label='Expiration Date',initial = datetime.date.today(),widget=SelectDateWidget())
+
+class ValuationMarketForm(forms.Form):
+    
+    underlying_price = fields.FloatField(label='Underlying Price')
+    underlying_price_2 = fields.FloatField(label='Second Underlying Price')
+    volatility = fields.FloatField(label='Underlying Volatility (decimal)')
+    volatility_2 = fields.FloatField(label='Second Underlying Volatility (decimal)')
+    correlation = fields.FloatField(label='Correlation (decimal)')
+    interest_rate = fields.FloatField(label='Risk-free rate (decimal)') 
+
+class OptionMarketForm(ValuationMarketForm):
+    def __init__(self,*args,**kwargs):
+        super(ValuationMarketForm, self).__init__(*args,**kwargs)
+        del self.fields['underlying_price_2'], self.fields['volatility_2'], self.fields['correlation']
+
+class ForwardParameterForm(ValuationParameterForm):
+    def __init__(self,*args,**kwargs):
+        super(ValuationParameterForm, self).__init__(*args,**kwargs)
+        del self.fields['call_put']
+        self.fields['strike'].label = 'Trade Price'
+        
+class ForwardMarketForm(ValuationMarketForm):
+    def __init__(self,*args,**kwargs):
+        super(ValuationMarketForm, self).__init__(*args,**kwargs)
+        del self.fields['underlying_price_2'], self.fields['volatility_2'], self.fields['correlation'], self.fields['volatility']
+        self.fields['underlying_price'].label = 'Forward Price'
+            
+class SelectDerivativeForm(forms.Form):
+    
+    derivatives = models.Derivatives.all().order('name')
+    derivative = fields.ChoiceField(choices = [(x.name,x.name) for x in derivatives],label='Type of Derivative')
+    derivative.widget.attrs["onchange"]="changeForm(this)" 
+    
+
+        

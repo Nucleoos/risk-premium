@@ -6,48 +6,52 @@ Created on Nov 29, 2010
 
 import math
 from stats.normal import cdf
-# Black Merton Scholes Function
 
+# Black Merton Scholes Function
 def bms(call_put,S,X,T,r,v,q):
 
-    d1 = (math.log(S/X)+(r+v*v/2.)*T)/(v*math.sqrt(T))
-
+    d1 = (math.log(S/X)+(r+v*v/2.0)*T)/(v*math.sqrt(T))
     d2 = d1-v*math.sqrt(T)
-    if call_put=='c':
+    
+    if call_put[0].lower()=='c':
 
         return S*math.exp(-q*T)*cdf(d1)-X*math.exp(-r*T)*cdf(d2)
 
     else:
 
         return X*math.exp(-r*T)*cdf(-d2)-S*cdf(-d1)
-    
+
+#Black 76 for option on forward    
 def black76(call_put,S,X,T,r,v):
     
     q = r
     return bms(call_put,S,X,T,r,v,q)
-    
+
+#Delta of option according to BMS    
 def bms_delta(call_put,S,X,T,r,v,q):
 
     d1 = (math.log(S/X)+(r+v*v/2.0)*T)/(v*math.sqrt(T))
 
-    if call_put=='c':
+    if call_put[0].lower()=='c':
 
         return cdf(d1)
 
     else:
 
-        return cdf(-d1)
-    
+        return -cdf(-d1)
+
+#Delta of option according to Black 76.    
 def black76_delta(call_put,S,X,T,r,v):
     
     d1 = math.exp(-r*T)*(math.log(S/X)+(v*v/2.0)*T)/(v*math.sqrt(T))
 
-    if call_put=='c':
+    if call_put[0].lower()=='c':
         return cdf(d1)
 
     else:
-        return cdf(-d1)
-    
+        return -cdf(-d1)
+
+#Kirk 75 for valuation of spread option    
 def kirk95(call_put,F,K,T,r,vol,corr):
     
     v = math.sqrt( vol[0]**2
@@ -58,10 +62,10 @@ def kirk95(call_put,F,K,T,r,vol,corr):
 
     d2 = d1-v*math.sqrt(T)
     
-    if call_put=='c':
+    if call_put[0].lower()=='c':
 
         return math.exp(-r*T)*(F[0]*cdf(d1)-(F[1]+K)*cdf(d2))
 
     else:
 
-        return math.exp(-r*T)*((F[1]+K)*cdf(d2)-F[0]*cdf(d1))
+        return math.exp(-r*T)*((F[1]+K)*cdf(-d2)-F[0]*cdf(-d1))
