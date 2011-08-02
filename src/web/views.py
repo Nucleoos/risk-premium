@@ -15,7 +15,7 @@ from django.forms.extras.widgets import SelectDateWidget
 from miscellaneous import data_loader
 from google.appengine.api import users
 import time, datetime
-from risk.VaR import VaR
+from risk import VaR, FTR
 
 
 LEFT_KIND = [
@@ -29,9 +29,22 @@ PRODUCT = [('Forward','Forward'),
 
 PERIOD_TYPE = [('Week','Week'),
                ('Month','Month'),
-               ('Year','Year')]
+               ('Year','Year'),
+               ('Hour','Hour')]
+
+IMPORT_TYPE = [('Price','Price'),
+               ('Volatility','Volatility'),
+               ('Interest Rate','Interest Rate'),
+               ('PJM DA Price','PJM DA Price')]
 
 def entry(request,kind,obj_id = None):
+    
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
 
     if request.method == 'POST':
         
@@ -52,9 +65,10 @@ def entry(request,kind,obj_id = None):
             error = form.errors
 
         if error:
-            return render_to_response('entry.html',{'form' : form,
-                                                'obj_id' : obj_id,
-                                                'kind' : kind})
+            return render_to_response('entry.html',{'user':user,'sign_in':loginout_url,
+                                                    'form' : form,
+                                                    'obj_id' : obj_id,
+                                                    'kind' : kind})
         else:
             return HttpResponseRedirect('/entry/' + kind)
     else:
@@ -66,7 +80,9 @@ def entry(request,kind,obj_id = None):
             form = eval(kind + 'Form()')
             form.set_choices()
             
-        return render_to_response('entry.html',{'form' : form,
+        return render_to_response('entry.html',{'user':user,
+                                                'sign_in':loginout_url,
+                                                'form' : form,
                                                 'obj_id' : obj_id,
                                                 'kind' : kind})
 
@@ -118,6 +134,13 @@ def entry_list(request,kind = 'Holiday',obj_id = None):
                                                 'list' : db_obj.date})
 
 def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None, underlying_id = None):
+
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
     
     if request.method == 'POST':
         
@@ -139,7 +162,9 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             underlying_form.set_choices()
             delivery_form = DeliveryForm(data=request.POST)
             delivery_form.set_choices()
-            return render_to_response('trade.html',{'form' : form,
+            return render_to_response('trade.html',{'user':user,
+                                                'sign_in':loginout_url,
+                                                'form' : form,
                                                 'obj_id' : trade_id,
                                                 'kind' : derivative,
                                                 'basket' : basket,
@@ -147,8 +172,9 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
                                                 'subsubform' : delivery_form})
         
         #Underlying
-        underlying = models.Underlying.all().filter('trade =',trade).get()
-        if basket:
+        underlying_query = models.Underlying.all().filter('trade =',trade)
+        underlying = underlying_query.get()
+        if basket or underlying_query.count()>1:
             if underlying and entry_button == 'Save':
                 underlying_form = UnderlyingForm(trade = trade,data=request.POST,instance=underlying)
             else:
@@ -167,7 +193,9 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
         else:
             delivery_form = DeliveryForm(data=request.POST)
             delivery_form.set_choices()
-            return render_to_response('trade.html',{'form' : form,
+            return render_to_response('trade.html',{'user':user,
+                                                'sign_in':loginout_url,
+                                                'form' : form,
                                                 'obj_id' : trade_id,
                                                 'kind' : derivative,
                                                 'basket' : basket,
@@ -187,7 +215,9 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             delivery.put()
             underlying.delivery = delivery
         else:
-            return render_to_response('trade.html',{'form' : form,
+            return render_to_response('trade.html',{'user':user,
+                                                'sign_in':loginout_url,
+                                                'form' : form,
                                                 'obj_id' : trade_id,
                                                 'kind' : derivative,
                                                 'basket' : basket,
@@ -225,7 +255,7 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
             underlying_query = models.Underlying.all().filter('trade =',trade)
             underlying_instance = underlying_query.get()
             if underlying_instance:
-                if basket:
+                if basket or underlying_query.count() > 1:
                     underlying_form = UnderlyingForm(initial={"commodity" : underlying_instance.commodity.name,
                                                   "delivery_point" : underlying_instance.delivery_point.name,
                                                   "weight" : underlying_instance.weight,
@@ -269,8 +299,10 @@ def trade_entry(request, derivative = 'Forward', basket = False, trade_id = None
                 
             delivery_form =DeliveryForm()
             delivery_form.set_choices()
-            
-        return render_to_response('trade.html',{'form' : form,
+         
+        return render_to_response('trade.html',{'user':user,
+                                                'sign_in':loginout_url,
+                                                'form' : form,
                                                 'obj_id' : trade_id,
                                                 'kind' : derivative,
                                                 'basket' : basket,
@@ -411,23 +443,53 @@ def list_delete(request, kind = 'Holiday', obj_id = None,attribute = None, year 
 
 def list(request,kind):
 
-    db_obj = eval('models.' + kind + '.all()')
-    return render_to_response('list.html',{'list' : db_obj,'kind' : kind})
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
+    
+    if request.method == 'POST':
+        #form = ListForm(request.POST)
+        pass
+    else:
+        #form = ListForm()      
+        db_obj = eval('models.' + kind + '.all()')
+        
+    return render_to_response('list.html',{'user':user,
+                                           'sign_in':loginout_url,
+                                           'list' : db_obj,
+                                           'kind' : kind})
 
 def imports(request):
+    
+    user = users.get_current_user()
 
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
+    
     if request.method == 'POST':
+        result=False
         form = ImportForm(request.POST, request.FILES)
-        import_type = request.POST.get('import')
-        if import_type == 'Import Prices':
-            result = data_loader.price(request.FILES['file'])
-        elif import_type == 'Import Volatilities':
-            result = data_loader.volatility(request.FILES['file'])
-        elif import_type == 'Import Interest Rate':
-            result = data_loader.interest_rate(request.FILES['file'])
-        else:
-            result = False
-        
+        if form.is_valid():
+            import_type = form.cleaned_data['type']
+            if import_type == 'Price':
+                result = data_loader.price(request.FILES['file'])
+            elif import_type == 'Volatility':
+                result = data_loader.volatility(request.FILES['file'])
+            elif import_type == 'Interest Rate':
+                result = data_loader.interest_rate(request.FILES['file'])
+            elif import_type == 'PJM DA Price':
+                if request.FILES.get('file'):
+                    file = request.FILES['file']
+                else:
+                    date = form.cleaned_data['date']
+                    file = 'http://www.pjm.com/pub/account/lmpda/' + date.strftime('%Y%m%d') +'-da.csv'
+                result = data_loader.pjm_da_price(file)
+            
         if result:
             done = 'Completed'
         else:
@@ -437,7 +499,10 @@ def imports(request):
         done = ''
         form = ImportForm()
     
-    return render_to_response('import.html',{'form' : form,'done':done})
+    return render_to_response('import.html',{'user':user,
+                                             'sign_in':loginout_url,
+                                             'form' : form,
+                                             'done':done})
 
 def import_prices(request):
     
@@ -447,48 +512,55 @@ def import_prices(request):
 
 def script(request):
     #trade_query = models.Trade.all()
-    #derivative = models.Derivatives.all().filter("name =","Forward").get()
-    
-    #for trade in trade_query:
-        #trade.derivative = derivative
-        #trade.put()
-            
     if request.method == 'POST':
+        date = datetime.datetime(2011,7,21)
+        period_query = models.Period.all().filter("type =","Hour").filter("first_date >=",date)
+        [x.delete() for x in period_query]
         
-        query = models.EndOfDay.all()
-     
-        for item in query:
-            item.delete()
-        
-        query = models.Market.all()
+        while date < datetime.datetime(2012,01,01):
             
-        for item in query:
-            item.delete()
+            end_date = date + datetime.timedelta(hours=1)
+            period_instance = models.Period(name=date.strftime('%b %d %Y') + ' HE' + str(int(date.strftime('%H'))+1),
+                                           first_date=date,
+                                           last_date=end_date,
+                                           type='Hour')
+            period_instance.put()
             
-        query = models.Price.all()
-            
-        for item in query:
-            item.delete()  
+            date = date + datetime.timedelta(hours=1)
+#        query = models.EndOfDay.all()
+#     
+#        for item in query:
+#            item.delete()
+#        
+#        query = models.Market.all()
+#            
+#        for item in query:
+#            item.delete()
+#            
+#        query = models.Price.all()
+#            
+#        for item in query:
+#            item.delete()
     #    
     #    query = models.Volatility.all()
     #        
     #    for item in query:
     #        item.delete()
     #        
-        query = models.Delivery.all()
-            
-        for item in query:
-            item.delete()
-
-        query = models.Underlying.all()
-            
-        for item in query:
-            item.delete()
- 
-        query = models.Trade.all()
-            
-        for item in query:
-            item.delete()   
+#        query = models.Delivery.all()
+#            
+#        for item in query:
+#            item.delete()
+#
+#        query = models.Underlying.all()
+#            
+#        for item in query:
+#            item.delete()
+# 
+#        query = models.Trade.all()
+#            
+#        for item in query:
+#            item.delete()   
         
            
         done = 'Completed'
@@ -570,9 +642,27 @@ def VaR(request):
     if user:
         logout_url = users.create_logout_url("/")
         result = VaR()
-        return render_to_response("VaR.html",{'user':user,'sign_out':logout_url,'result':result})
+        return render_to_response("VaR.html",{'user':user,
+                                              'sign_out':logout_url,
+                                              'result':result})
     else:
-        return render_to_response("welcome.html")
+        return render_to_response("welcome.html",{'user':user,
+                                                  'sign_out':logout_url,
+                                                  'result':result})
+
+def transmission(request):
+    
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
+    
+    result = FTR.FTR()
+    return render_to_response("ftr.html",{'user':user,
+                                          'sign_out':loginout_url,
+                                          'result':result})
         
 def welcome(request):
     
@@ -784,6 +874,13 @@ def valuation_engine(request,derivative = 'Option on Spot'):
     
     
 def market(request):
+
+    user = users.get_current_user()
+
+    if user:
+        loginout_url = users.create_logout_url("/")
+    else:
+        loginout_url = users.create_login_url("/")
     
     if request.method == 'POST':
         
@@ -799,25 +896,36 @@ def market(request):
         market_form = MarketForm(request.POST)
         market_form.set_choices()
         
-        if request.POST.get('type', '')=='Price':
+        type = request.POST.get('type', '')
+        
+        if type=='Price':
             table = [['Delivery','Mid','Bid','Offer']]
             for item in market:
                 table.append([item.delivery.period.name,item.price.mid,item.price.bid,item.price.offer])
-        elif request.POST.get('type', '')=='Volatility':
+        elif type=='Volatility':
             table = [['Delivery','Mid','Moneyness']]
             for item in market:
                 table.append([item.delivery.period.name,item.volatility.mid,item.volatility.moneyness])
+        elif type=='PJM DA Price':
+            table = [['Delivery','LMP','Congestion','Loss']]
+            for item in market:
+                table.append([item.delivery.period.name,item.price.day_ahead,item.price.congestion,item.price.loss])        
+        
         else:
             table = []
             pass
         
-        return render_to_response("market.html",{'form':market_form,'table':table})
+        return render_to_response("market.html",{'user':user,
+                                                 'sign_in':loginout_url,
+                                                 'form':market_form,'table':table})
         
     else:
         market_form = MarketForm()
         market_form.set_choices()
 
-        return render_to_response("market.html",{'form':market_form})
+        return render_to_response("market.html",{'user':user,
+                                                 'sign_in':loginout_url,
+                                                 'form':market_form})
         
 class CommodityForm(djangoforms.ModelForm):
     
@@ -888,21 +996,25 @@ class DeliveryForm(forms.Form):
         self['profile'].field.choices = [(x.name,x.name) for x in profile]
     
     def save(self, commit=True):
-        period = models.Period.all()
-        period.filter("name =", self.cleaned_data['period'])
-        calendar = models.Calendar.all()
-        calendar.filter("name =", self.cleaned_data['calendar'])
-        profile = models.Profile.all()
-        profile.filter("name =", self.cleaned_data['profile'])
+
+        period_instance = models.Period.all().filter("name =", self.cleaned_data['period']).get()
+
+        calendar_instance = models.Calendar.all().filter("name =", self.cleaned_data['calendar']).get()
+
+        profile_instance = models.Profile.all().filter("name =", self.cleaned_data['profile']).get()
+        
+        
         if self.instance:
             instance = self.instance
-            instance.period = period.get()
-            instance.calendar = calendar.get()
-            instance.profile = profile.get()
+            instance.period = period_instance
+            instance.calendar = calendar_instance
+            instance.profile = profile_instance
         else:
-            instance = models.Delivery(period = period.get(),
-                                       calendar = calendar.get(),
-                                       profile = profile.get())
+            instance = models.Delivery.all().filter("period =",period_instance).filter("calendar =",calendar_instance).filter("profile =",profile_instance).get()
+            if not(instance):
+                instance = models.Delivery(period = period_instance,
+                                           calendar = calendar_instance,
+                                           profile = profile_instance)
         if commit:
             instance.put()
         return instance
@@ -1234,8 +1346,9 @@ class HolidayForm(forms.Form):
 class DeliveryPointForm(forms.Form):
     
     name = fields.CharField()
-    nickname = fields.CharField()
+    nickname = fields.CharField(required=False)
     commodity = fields.ChoiceField(label='Commodity')
+    node_id = fields.IntegerField(label='Node ID',required=False)
 
     def __init__(self, *args, **kwargs):
         data = kwargs.get('data',None)
@@ -1246,7 +1359,8 @@ class DeliveryPointForm(forms.Form):
         elif self.instance:
             initial = {'commodity':self.instance.commodity.name,
                        'name':self.instance.name,
-                       'nickname':self.instance.nickname}
+                       'nickname':self.instance.nickname,
+                       'node_id':self.instance.node_id}
             super(DeliveryPointForm, self).__init__(data=initial)
         else:
             super(DeliveryPointForm, self).__init__(*args, **kwargs)
@@ -1267,10 +1381,12 @@ class DeliveryPointForm(forms.Form):
             instance.commodity = commodity.get()
             instance.name = self.cleaned_data['name']
             instance.nickname = self.cleaned_data['nickname']
+            instance.node_id = self.cleaned_data['node_id']
         else:
             instance = models.DeliveryPoint(commodity = commodity.get(),
                                             name = self.cleaned_data['name'],
-                                            nickname = self.cleaned_data['nickname'])
+                                            nickname = self.cleaned_data['nickname'],
+                                            node_id = self.cleaned_data['node_id'])
         if commit:
             instance.put()
         return instance
@@ -1278,8 +1394,8 @@ class DeliveryPointForm(forms.Form):
 class PeriodForm(forms.Form):
     
     name = fields.CharField()
-    first_date = fields.DateField(label = 'Start Date')
-    last_date = fields.DateField(label='End Date')
+    first_date = fields.DateTimeField(label = 'Start Date')
+    last_date = fields.DateTimeField(label='End Date')
     type = fields.ChoiceField()
 
     def __init__(self, *args, **kwargs):
@@ -1360,11 +1476,13 @@ class MarketForm(forms.Form):
         eod = models.EndOfDay.all().order('-date')
         self['delivery_point'].field.choices = [(x.name,x.name) for x in delivery_point]
         self['eod'].field.choices = [(x.date,x.date) for x in eod]
-        self['type'].field.choices = [('Price','Price'),('Volatility','Volatility'),('Interest Rate','Interest Rate')]
+        self['type'].field.choices = IMPORT_TYPE
         
 class ImportForm(forms.Form):
 
-    file = forms.FileField()
+    type = fields.ChoiceField(label='Type',choices=IMPORT_TYPE)
+    file = forms.FileField(required=False)
+    date = fields.DateField(initial = datetime.date.today(),widget=SelectDateWidget())
     
 class ValuationParameterForm(forms.Form):
     
@@ -1406,6 +1524,3 @@ class SelectDerivativeForm(forms.Form):
     derivatives = models.Derivatives.all().order('name')
     derivative = fields.ChoiceField(choices = [(x.name,x.name) for x in derivatives],label='Type of Derivative')
     derivative.widget.attrs["onchange"]="changeForm(this)" 
-    
-
-        

@@ -4,7 +4,7 @@ Created on Feb 4, 2011
 @author: t-bone
 '''
 #from google.appengine.api import urlfetch
-
+import urllib2
 
 #if result.status_code == 200:
 #  parseCSV(result.content)
@@ -50,7 +50,7 @@ def price(file):
             calendar_instance = calendar_query.filter("name =",'Base').get()
             
             delivery_query = Delivery.all()
-            delivery_instance = delivery_query.filter("period =",period_instance).filter("calendar =",'Base').filter("profile =",profile_instance).get()
+            delivery_instance = delivery_query.filter("period =",period_instance).filter("calendar =",calendar_instance).filter("profile =",profile_instance).get()
             if not(delivery_instance):
                 delivery_instance = Delivery(period=period_instance,calendar=calendar_instance,profile=profile_instance)
                 delivery_instance.put()
@@ -67,6 +67,161 @@ def price(file):
                                      delivery = delivery_instance)
             market_instance.put()
     
+    return True
+
+def pjm_da_price(file):
+    
+    result = urllib2.urlopen(file)
+    read = False
+    counter = 0
+    file = result.readlines()
+    for row in file:
+
+        row = row.split(',')
+
+        if row[0]=='End of Day Ahead LMP Data':
+            break
+        
+        if read:
+        
+            if not(counter):
+                eod = time.strptime(row[0],"%Y%m%d")
+                eod = datetime.datetime(eod[0],eod[1],eod[2])
+                
+                eod_query = EndOfDay.all()
+                eod_instance = eod_query.filter("date =",eod.date()).get()
+                if not(eod_instance):
+                    eod_instance = EndOfDay(date=eod.date())
+            
+            delivery_point_query = DeliveryPoint.all()
+            delivery_point_node_id = int(row[1])
+            delivery_point_instance = delivery_point_query.filter("node_id =", delivery_point_node_id).get()
+            
+            if delivery_point_instance:
+                
+                for iHour in range(24):
+                    
+                    if not(counter):
+                        period_start = eod + datetime.timedelta(hours=iHour)
+                        period_end = period_start + datetime.timedelta(hours=1)
+                        period_query = Period.all()
+                        period_instance = period_query.filter("first_date =",period_start).filter("last_date =",period_end).get()
+                        
+                    if not(period_instance):
+                        period_instance = Period(name=period_start.strftime('%b %d %Y') + ' HE' + str(iHour + 1),
+                                           first_date=period_start,
+                                           last_date=period_end,
+                                           type='Hour')
+                        period_instance.put()
+                        
+                            
+                    profile_query = Profile.all()
+                    profile_instance = profile_query.filter("name =",'Flat').get()
+                    
+                    calendar_query = Calendar.all()
+                    calendar_instance = calendar_query.filter("name =",'Base').get()
+                    
+                    delivery_query = Delivery.all()
+                    delivery_instance = delivery_query.filter("period =",period_instance).filter("calendar =",calendar_instance).filter("profile =",profile_instance).get()
+                    
+                    if not(delivery_instance):
+                        delivery_instance = Delivery(period=period_instance,calendar=calendar_instance,profile=profile_instance)
+                        delivery_instance.put()
+                    
+                    price_instance = Price(day_ahead=float(row[7+iHour*3]),
+                                    congestion=float(row[8+iHour*3]),
+                                    loss=float(row[9+iHour*3]))
+                    price_instance.put()
+                    
+                    eod_instance.put()
+                    market_instance = Market(eod=eod_instance,
+                                             delivery_point = delivery_point_instance,
+                                             price = price_instance,
+                                             delivery = delivery_instance)
+                    market_instance.put()
+                        
+                counter = counter + 1
+    
+        if row[0]=='Date':
+            read=True
+                
+    return True
+
+def pjm_da_price2(file):
+    
+    price_reader = csv.reader(file, delimiter=',', quotechar="'")
+    #price_reader = csv.reader(open(file, 'rb'), delimiter=',', quotechar="'")
+    #price_reader = file
+    read = False
+    counter = 0
+    for row in price_reader:
+        
+        if row[0]=='End of Day Ahead LMP Data':
+            break
+        
+        if read:
+        
+            if not(counter):
+                eod = time.strptime(row[0],"%Y%m%d")
+                eod = datetime.datetime(eod[0],eod[1],eod[2])
+                
+                eod_query = EndOfDay.all()
+                eod_instance = eod_query.filter("date =",eod.date()).get()
+                if not(eod_instance):
+                    eod_instance = EndOfDay(date=eod.date())
+            
+            delivery_point_query = DeliveryPoint.all()
+            delivery_point_node_id = int(row[1])
+            delivery_point_instance = delivery_point_query.filter("node_id =", delivery_point_node_id).get()
+            
+            if delivery_point_instance:
+                
+                for iHour in range(24):
+                    
+                    if not(counter):
+                        period_start = eod + datetime.timedelta(hours=iHour)
+                        period_end = period_start + datetime.timedelta(hours=1)
+                        period_query = Period.all()
+                        period_instance = period_query.filter("first_date =",period_start).filter("last_date =",period_end).get()
+                        
+                    if not(period_instance):
+                        period_instance = Period(name=period_start.strftime('%b %d %Y') + ' HE' + str(iHour + 1),
+                                           first_date=period_start,
+                                           last_date=period_end,
+                                           type='Hour')
+                        period_instance.put()
+                        
+                            
+                    profile_query = Profile.all()
+                    profile_instance = profile_query.filter("name =",'Flat').get()
+                    
+                    calendar_query = Calendar.all()
+                    calendar_instance = calendar_query.filter("name =",'Base').get()
+                    
+                    delivery_query = Delivery.all()
+                    delivery_instance = delivery_query.filter("period =",period_instance).filter("calendar =",'Base').filter("profile =",profile_instance).get()
+                    
+                    if not(delivery_instance):
+                        delivery_instance = Delivery(period=period_instance,calendar=calendar_instance,profile=profile_instance)
+                        delivery_instance.put()
+                    
+                    price_instance = Price(day_ahead=float(row[7+iHour*3]),
+                                    congestion=float(row[8+iHour*3]),
+                                    loss=float(row[9+iHour*3]))
+                    price_instance.put()
+                    
+                    eod_instance.put()
+                    market_instance = Market(eod=eod_instance,
+                                             delivery_point = delivery_point_instance,
+                                             price = price_instance,
+                                             delivery = delivery_instance)
+                    market_instance.put()
+                        
+                counter = counter + 1
+    
+        if row[0]=='Date':
+            read=True
+                
     return True
 
 def volatility(file):

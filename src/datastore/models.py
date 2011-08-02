@@ -43,8 +43,8 @@ class Profile(db.Model):
 class Period(db.Model):
 
     name = db.StringProperty()
-    first_date = db.DateProperty()
-    last_date = db.DateProperty()
+    first_date = db.DateTimeProperty()
+    last_date = db.DateTimeProperty()
     type = db.StringProperty()
     
     def reference(self):
@@ -65,6 +65,29 @@ class Underlying(db.Model):
     trade = db.ReferenceProperty(collection_name='underlyings_trade')
     weight = db.FloatProperty()
     uom = db.ReferenceProperty(UnitOfMeasure,collection_name='underlyings_uom')
+
+    def detailed_delivery(self):
+
+        if self.delivery.profile.granularity == 'hourly':
+            period_query = Period.all().filter("type =",'Hour')
+            period_query.filter('first_date >=',self.delivery.period.first_date)
+            period_query.filter('first_date <',self.delivery.period.last_date).order('first_date')
+            
+            pos = []
+#            market = []
+            for period in period_query:
+                pos.append((period.name,self.weight))
+#                
+#                delivery = Delivery.all().filter("period =",period).filter("calendar =",self.delivery.calendar).filter("profile =",self.delivery.profile).get()
+#                market_query = Market.all().filter("delivery_point =",self.delivery_point)
+#                market_query.filter("delivery =",delivery)
+#                market.append(market_query)
+#                x=market_query.get()
+#                x=y
+#            
+            return pos
+        else:
+            return [('Not implemented yet',0),0]
 
 class Book(db.Model):
     
@@ -168,12 +191,18 @@ class Trade(db.Model):
             
         else:
             self.MTM = self.derivative.name + ' is an unknown valuation model.'
+            
+    def delete(self):
+        
+        db.delete(self.underlying)
+        db.delete(self)    
 
 class DeliveryPoint(db.Model):
     
     name = db.StringProperty(db.Model)
     nickname = db.StringProperty(db.Model)
     commodity = db.ReferenceProperty(Commodity)
+    node_id = db.IntegerProperty(db.Model)
     
 class Market(db.Model):
     
@@ -194,6 +223,9 @@ class Price(db.Model):
     mid = db.FloatProperty()
     bid = db.FloatProperty()
     offer = db.FloatProperty()
+    day_ahead = db.FloatProperty()
+    congestion = db.FloatProperty()
+    loss = db.FloatProperty()
 
 class InterestRate(db.Model):
     

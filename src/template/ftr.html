@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% comment %}
+{% block title %}Hazlo - VaR{% endblock %}
+{% endcomment %}
+
+{% block body %}
+	<table class="ae-table">
+	  <tr>
+	    <th>Delivery Point</th>
+	    <th>Delivery</th>
+	    <th>Delta</th>
+	    {% for dp_name, del_name, position in result %}
+		<tr>
+		  <td>
+		  {{ dp_name }}
+		  </td>
+		  <td>
+		  {{ del_name }}
+		  </td>
+		  <td>
+		  {{ position }}
+		  </td>
+		</tr>
+	  {% endfor %}
+	</table>
+{% endblock %}
