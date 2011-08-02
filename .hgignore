@@ -6,7 +6,6 @@ syntax: glob
 *~
 settings.py
 old/**
-src/django/**
 
 syntax: regexp
 .*\#.*\#$
