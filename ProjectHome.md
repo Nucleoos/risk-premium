@@ -1,0 +1,1 @@
+Risk management hosted app. It includes a pricing library, simulation engine and strong reporting capability.
